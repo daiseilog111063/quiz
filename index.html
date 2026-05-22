@@ -361,8 +361,80 @@
     vertical-align: middle;
   }
   .stat-badge.mastered { background: #e8f8ec; color: #1d6b32; }
-  .stat-badge.weak { background: #fef0e0; color: #8a4a00; }
+  .stat-badge.vague { background: #fff3cd; color: #856404; }
+  .stat-badge.weak { background: #fde8e7; color: #8a1a13; }
   .stat-badge.new { background: #f0f0f3; color: #6e6e73; }
+
+  .learning-status .ls-bar-vague { background: #ffcc00; height: 100%; }
+  .learning-status .ls-legend .lg-vague::before { background: #ffcc00; }
+  .learning-status .ls-legend .lg-learning::before { background: #5ac8fa; }
+  .learning-status .ls-bar-learning { background: #5ac8fa; height: 100%; }
+
+  .vague-area {
+    margin-top: 14px;
+    padding: 10px 14px;
+    background: #fffbe6;
+    border: 1px solid #ffe7a0;
+    border-radius: 8px;
+  }
+  .vague-area label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    font-size: 14px;
+    color: #856404;
+  }
+  .vague-area input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+  }
+
+  /* 詳細レビュー画面の選択肢表示 */
+  .review-choice {
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 2px solid transparent;
+    background: #f5f5f7;
+    white-space: pre-wrap;
+    font-size: 15px;
+  }
+  .review-choice.correct {
+    background: #e8f8ec;
+    border-color: #34c759;
+    color: #1d6b32;
+  }
+  .review-choice.user-wrong {
+    background: #fde8e7;
+    border-color: #ff3b30;
+    color: #8a1a13;
+  }
+  .review-choice .mark {
+    font-weight: 700;
+    margin-right: 8px;
+  }
+  .review-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .review-info {
+    background: #f5f5f7;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #555;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .skip-mark { color: #ff9500; font-weight: 600; }
 
   .category-item .cat-meta {
     width: 100%;
@@ -536,7 +608,8 @@
         <select id="filterSelect">
           <option value="all">全問</option>
           <option value="unanswered">未学習のみ</option>
-          <option value="wrong">苦手（直近で不正解）</option>
+          <option value="wrong">苦手（直近で不正解 or スキップ）</option>
+          <option value="vague">あいまい（直近で曖昧マーク）</option>
           <option value="lowRate">正解率が50%未満</option>
           <option value="correct">復習（直近で正解）</option>
         </select>
@@ -547,6 +620,14 @@
         <div class="toggle-group" id="orderToggle">
           <button type="button" class="toggle-btn active" data-value="sequential">順番通り</button>
           <button type="button" class="toggle-btn" data-value="random">ランダム</button>
+        </div>
+      </div>
+
+      <div class="settings-row">
+        <label>選択肢順</label>
+        <div class="toggle-group" id="shuffleToggle">
+          <button type="button" class="toggle-btn active" data-value="shuffle">シャッフル</button>
+          <button type="button" class="toggle-btn" data-value="fixed">固定</button>
         </div>
       </div>
 
@@ -589,6 +670,12 @@
       <div class="tag-line" id="tagLine"></div>
       <div class="question" id="questionText"></div>
       <div class="choices" id="choicesArea"></div>
+      <div class="vague-area" id="vagueArea">
+        <label>
+          <input type="checkbox" id="vagueCheckbox">
+          <span>自信がない・あいまい（答え合わせ前に印を付ける）</span>
+        </label>
+      </div>
       <div id="feedback" style="display:none;"></div>
       <div class="actions">
         <button id="nextBtn" class="btn" style="display:none;">次の問題 →</button>
@@ -607,8 +694,9 @@
         <div class="score-detail" id="finalTime" style="margin-top:8px;"></div>
       </div>
       <div class="actions" style="justify-content:center;">
-        <button id="exportBtn" class="btn">CSVをダウンロード</button>
-        <button id="reviewBtn" class="btn secondary">問題ごとに確認</button>
+        <button id="detailReviewBtn" class="btn">📝 1問ずつ詳細を見る</button>
+        <button id="exportBtn" class="btn secondary">CSVをダウンロード</button>
+        <button id="reviewBtn" class="btn secondary">一覧で確認</button>
       </div>
     </div>
 
@@ -630,6 +718,27 @@
     </div>
   </div>
 
+  <!-- ⑤ 詳細レビュー -->
+  <div id="resultReviewView" style="display:none;">
+    <div class="card">
+      <div class="meta">
+        <span id="reviewProgressText"></span>
+        <span id="reviewJudgeText"></span>
+      </div>
+      <div class="progress"><div class="progress-bar" id="reviewProgressBar"></div></div>
+      <div class="review-info" id="reviewInfo"></div>
+      <div class="tag-line" id="reviewTagLine"></div>
+      <div class="question" id="reviewQuestionText"></div>
+      <div id="reviewChoicesArea"></div>
+      <div class="feedback" id="reviewExplanation" style="display:none;"></div>
+      <div class="review-nav">
+        <button id="reviewPrevBtn" class="btn secondary">← 前の問題</button>
+        <button id="reviewBackToResultBtn" class="btn secondary">結果サマリへ戻る</button>
+        <button id="reviewNextBtn" class="btn">次の問題 →</button>
+      </div>
+    </div>
+  </div>
+
 <script>
 const STORAGE_KEY = 'quiz_v3_state';
 const CSV_KEY = 'quiz_v3_csv';
@@ -639,8 +748,9 @@ const HISTORY_KEY = 'quiz_v3_history';
 let history = {};
 
 function hashQ(q) {
-  // 問題文+選択肢から安定したIDを生成
-  const s = (q.question || '') + '|' + (q.choices || []).join('|');
+  // 問題文+選択肢（シャッフル前）から安定したIDを生成
+  const baseChoices = q._originalChoices || q.choices || [];
+  const s = (q.question || '') + '|' + baseChoices.join('|');
   let h = 5381;
   for (let i = 0; i < s.length; i++) {
     h = ((h << 5) + h + s.charCodeAt(i)) | 0;
@@ -663,7 +773,7 @@ function clearHistoryAll() {
 function getStat(q) {
   const h = history[hashQ(q)];
   if (!h || !h.attempts) {
-    return { attempts: 0, correct: 0, rate: null, last: null, lastDate: null, recent: [] };
+    return { attempts: 0, correct: 0, rate: null, last: null, lastDate: null, recent: [], lastVague: false };
   }
   return {
     attempts: h.attempts,
@@ -671,27 +781,32 @@ function getStat(q) {
     rate: Math.round((h.correct / h.attempts) * 100),
     last: h.last,
     lastDate: h.lastDate,
-    recent: h.recent || []
+    recent: h.recent || [],
+    lastVague: !!h.lastVague
   };
 }
 
-function recordAttempt(q, ok) {
+function recordAttempt(q, ok, vague) {
   const id = hashQ(q);
-  if (!history[id]) history[id] = { attempts: 0, correct: 0, last: null, lastDate: null, recent: [] };
+  if (!history[id]) history[id] = { attempts: 0, correct: 0, last: null, lastDate: null, recent: [], lastVague: false };
   history[id].attempts++;
   if (ok) history[id].correct++;
   history[id].last = ok ? 'o' : 'x';
   history[id].lastDate = new Date().toISOString();
   history[id].recent = (history[id].recent || []).concat(ok ? 'o' : 'x').slice(-10);
+  history[id].lastVague = !!vague;
   saveHistory();
 }
 
-// 学習状態の分類: 'mastered'（直近正解 & 正解率>=80）/'weak'（直近不正解 or 正解率<50）/'learning'（中間）/'new'（未学習）
+// 学習状態の分類:
+//   'new' 未学習 / 'weak' 直近不正解 or 正解率<50
+//   'vague' 直近正解だが曖昧マーク / 'mastered' 直近正解 & 正解率>=80 & 曖昧でない / 'learning' 中間
 function masteryOf(q) {
   const s = getStat(q);
   if (s.attempts === 0) return 'new';
   if (s.last === 'x') return 'weak';
   if (s.rate !== null && s.rate < 50) return 'weak';
+  if (s.lastVague) return 'vague';
   if (s.rate !== null && s.rate >= 80 && s.last === 'o') return 'mastered';
   return 'learning';
 }
@@ -702,6 +817,7 @@ function matchesFilter(q, filterValue) {
     case 'all': return true;
     case 'unanswered': return s.attempts === 0;
     case 'wrong': return s.attempts > 0 && s.last === 'x';
+    case 'vague': return s.attempts > 0 && s.last === 'o' && s.lastVague;
     case 'lowRate': return s.attempts > 0 && s.rate !== null && s.rate < 50;
     case 'correct': return s.attempts > 0 && s.last === 'o';
     default: return true;
@@ -837,11 +953,11 @@ function correctIndex(q) {
 
 // --- 画面切替 ---
 function show(viewId) {
-  ['uploadView', 'settingsView', 'quizView', 'resultView'].forEach(id => {
+  ['uploadView', 'settingsView', 'quizView', 'resultView', 'resultReviewView'].forEach(id => {
     document.getElementById(id).style.display = (id === viewId) ? '' : 'none';
   });
   document.getElementById('resetBtn').style.display =
-    (viewId === 'quizView' || viewId === 'resultView') ? '' : 'none';
+    (viewId === 'quizView' || viewId === 'resultView' || viewId === 'resultReviewView') ? '' : 'none';
   document.getElementById('backToSettingsBtn').style.display =
     (viewId === 'quizView') ? '' : 'none';
 }
@@ -854,6 +970,10 @@ function init() {
 
   state = loadState();
   if (state && state.questions && state.questions.length > 0) {
+    // 旧データ互換
+    if (!state.durations) state.durations = new Array(state.questions.length).fill(0);
+    if (!state.skipped) state.skipped = new Array(state.questions.length).fill(false);
+    if (!state.vague) state.vague = new Array(state.questions.length).fill(false);
     if (state.index >= state.questions.length) showResult();
     else { show('quizView'); renderQuestion(); }
     return;
@@ -906,14 +1026,45 @@ document.getElementById('reuploadBtn').addEventListener('click', () => {
 });
 
 // --- 設定画面 ---
-let settings = { order: 'sequential', count: 10, majors: new Set(), filter: 'all' };
+let settings = { order: 'sequential', count: 10, majors: new Set(), filter: 'all', shuffleChoices: true };
+const VAGUE_THRESHOLD_MS = 30000;
+
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// 選択肢をシャッフルし、元の正解番号を保ったまま正解インデックスを更新
+function shuffleQuestion(q) {
+  const origChoices = q.choices.slice();
+  const origCorrect = q.correct;
+  const correctIdxOrig = correctIndex({ ...q, choices: origChoices });
+  if (correctIdxOrig < 0) {
+    return { ...q, _originalChoices: origChoices, _originalCorrect: origCorrect };
+  }
+  const indices = origChoices.map((_, i) => i);
+  const shuffled = shuffleArray(indices);
+  const newChoices = shuffled.map(i => origChoices[i]);
+  const newCorrectIdx = shuffled.indexOf(correctIdxOrig);
+  return {
+    ...q,
+    _originalChoices: origChoices,
+    _originalCorrect: origCorrect,
+    choices: newChoices,
+    correct: String(newCorrectIdx + 1)
+  };
+}
 
 function renderLearningStatus() {
   const el = document.getElementById('learningStatus');
   if (!el) return;
   if (allQuestions.length === 0) { el.style.display = 'none'; return; }
 
-  let mastered = 0, weak = 0, learning = 0, neww = 0;
+  let mastered = 0, weak = 0, vague = 0, learning = 0, neww = 0;
   let totalAttempts = 0, totalCorrect = 0;
   for (const q of allQuestions) {
     const s = getStat(q);
@@ -922,6 +1073,7 @@ function renderLearningStatus() {
     switch (masteryOf(q)) {
       case 'mastered': mastered++; break;
       case 'weak': weak++; break;
+      case 'vague': vague++; break;
       case 'learning': learning++; break;
       default: neww++;
     }
@@ -930,8 +1082,10 @@ function renderLearningStatus() {
   const rate = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0;
   const tot = allQuestions.length || 1;
   const pctM = (mastered / tot) * 100;
+  const pctV = (vague / tot) * 100;
   const pctL = (learning / tot) * 100;
   const pctW = (weak / tot) * 100;
+  const pctN = Math.max(0, 100 - pctM - pctV - pctL - pctW);
 
   el.style.display = '';
   el.innerHTML = `
@@ -951,13 +1105,16 @@ function renderLearningStatus() {
       </div>
     </div>
     <div class="ls-bar-wrap" title="習熟度の分布">
-      <div class="ls-bar-mastered" style="width:${pctM}%"></div>
+      <div class="ls-bar-mastered" style="width:${pctM}%" title="習得"></div>
+      <div class="ls-bar-learning" style="width:${pctL}%" title="学習中"></div>
+      <div class="ls-bar-vague" style="width:${pctV}%" title="あいまい"></div>
       <div class="ls-bar-weak" style="width:${pctW}%" title="苦手"></div>
-      <div class="ls-bar-new" style="width:${100 - pctM - pctW - pctL}%"></div>
+      <div class="ls-bar-new" style="width:${pctN}%" title="未学習"></div>
     </div>
     <div class="ls-legend">
       <span class="lg-mastered">習得 ${mastered}</span>
-      <span>学習中 ${learning}</span>
+      <span class="lg-learning">学習中 ${learning}</span>
+      <span class="lg-vague">あいまい ${vague}</span>
       <span class="lg-weak">苦手 ${weak}</span>
       <span class="lg-new">未学習 ${neww}</span>
     </div>
@@ -1010,6 +1167,9 @@ function renderSettings() {
   document.getElementById('orderToggle').querySelectorAll('.toggle-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.value === settings.order);
   });
+  document.getElementById('shuffleToggle').querySelectorAll('.toggle-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.value === (settings.shuffleChoices ? 'shuffle' : 'fixed'));
+  });
   document.getElementById('filterSelect').value = settings.filter;
   updateMaxHint();
 }
@@ -1031,6 +1191,15 @@ document.getElementById('orderToggle').addEventListener('click', e => {
   if (e.target.classList.contains('toggle-btn')) {
     settings.order = e.target.dataset.value;
     document.getElementById('orderToggle').querySelectorAll('.toggle-btn').forEach(b => {
+      b.classList.toggle('active', b === e.target);
+    });
+  }
+});
+
+document.getElementById('shuffleToggle').addEventListener('click', e => {
+  if (e.target.classList.contains('toggle-btn')) {
+    settings.shuffleChoices = (e.target.dataset.value === 'shuffle');
+    document.getElementById('shuffleToggle').querySelectorAll('.toggle-btn').forEach(b => {
       b.classList.toggle('active', b === e.target);
     });
   }
@@ -1115,23 +1284,29 @@ document.getElementById('startBtn').addEventListener('click', () => {
   if (pool.length === 0) { alert('条件に合う問題がありません。フィルタや大分類を確認してください。'); return; }
 
   if (settings.order === 'random') {
-    for (let i = pool.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pool[i], pool[j]] = [pool[j], pool[i]];
-    }
+    pool = shuffleArray(pool);
   }
 
   const count = Math.max(1, Math.min(parseInt(document.getElementById('countInput').value) || 1, pool.length));
   pool = pool.slice(0, count);
+
+  // 選択肢シャッフル（履歴ハッシュは _originalChoices で保持）
+  if (settings.shuffleChoices) {
+    pool = pool.map(q => shuffleQuestion(q));
+  } else {
+    pool = pool.map(q => ({ ...q, _originalChoices: q.choices.slice() }));
+  }
 
   state = {
     questions: pool,
     index: 0,
     answers: new Array(pool.length).fill(null),
     durations: new Array(pool.length).fill(0),
+    skipped: new Array(pool.length).fill(false),
+    vague: new Array(pool.length).fill(false),
     currentQuestionStart: null,
     startedAt: new Date().toISOString(),
-    settings: { order: settings.order, majors: Array.from(settings.majors) }
+    settings: { order: settings.order, majors: Array.from(settings.majors), shuffleChoices: settings.shuffleChoices }
   };
   saveState();
   show('quizView');
@@ -1187,6 +1362,15 @@ function renderQuestion() {
   document.getElementById('nextBtn').style.display = 'none';
   document.getElementById('skipBtn').style.display = '';
 
+  // vague チェックボックスをリセット（旧データ補完）
+  if (!state.vague) state.vague = new Array(state.questions.length).fill(false);
+  if (!state.skipped) state.skipped = new Array(state.questions.length).fill(false);
+  const vagueArea = document.getElementById('vagueArea');
+  const vagueCb = document.getElementById('vagueCheckbox');
+  vagueCb.checked = !!state.vague[i];
+  vagueCb.disabled = (state.answers[i] !== null);
+  vagueArea.style.display = '';
+
   // 数式の再描画（問題文と選択肢）
   typesetMath([
     document.getElementById('questionText'),
@@ -1200,16 +1384,37 @@ function renderQuestion() {
   if (state.answers[i] !== null) showAnswerResult(state.answers[i]);
 }
 
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'vagueCheckbox') {
+    if (state && state.vague) {
+      state.vague[state.index] = e.target.checked;
+      saveState();
+    }
+  }
+});
+
 function handleAnswer(choice) {
   // 同じ問題に二重回答しないようガード
   if (state.answers[state.index] !== null) {
     showAnswerResult(state.answers[state.index]);
     return;
   }
+  // この問題の所要時間を確定
+  accumulateCurrentTime();
+  stopTimer();
+
   state.answers[state.index] = String(choice);
   const q = state.questions[state.index];
   const ok = isCorrect(q, String(choice));
-  recordAttempt(q, ok);
+
+  // 曖昧判定: ユーザーチェック OR 所要時間が閾値超
+  const dur = (state.durations && state.durations[state.index]) || 0;
+  const userMarked = !!(state.vague && state.vague[state.index]);
+  const timeBased = dur >= VAGUE_THRESHOLD_MS;
+  const isVague = userMarked || timeBased;
+  state.vague[state.index] = isVague;
+
+  recordAttempt(q, ok, isVague);
   saveState();
   showAnswerResult(String(choice));
 }
@@ -1232,8 +1437,16 @@ function showAnswerResult(userAnswer) {
   fb.style.display = '';
   fb.className = 'feedback ' + (ok ? 'correct' : 'incorrect');
   let txt = ok ? '✅ 正解！' : `❌ 不正解（正解: ${correctIdx + 1}）`;
+  const isVague = !!(state.vague && state.vague[state.index]);
+  if (isVague) txt += '  🟡 あいまい';
   if (q.explanation && q.explanation.trim()) txt += '\n\n💡 ' + q.explanation;
   fb.textContent = txt;
+
+  const vagueCb = document.getElementById('vagueCheckbox');
+  if (vagueCb) {
+    vagueCb.checked = isVague;
+    vagueCb.disabled = true;
+  }
 
   document.getElementById('skipBtn').style.display = 'none';
   document.getElementById('nextBtn').style.display = '';
@@ -1255,6 +1468,16 @@ document.getElementById('nextBtn').addEventListener('click', () => {
 document.getElementById('skipBtn').addEventListener('click', () => {
   accumulateCurrentTime();
   stopTimer();
+  // スキップは不正解扱い（履歴にも記録）
+  const i = state.index;
+  if (state.answers[i] === null) {
+    if (!state.skipped) state.skipped = new Array(state.questions.length).fill(false);
+    state.skipped[i] = true;
+    state.answers[i] = 'skip';
+    const q = state.questions[i];
+    const userMarked = !!(state.vague && state.vague[i]);
+    recordAttempt(q, false, userMarked);
+  }
   state.index++;
   saveState();
   if (state.index >= state.questions.length) showResult();
@@ -1320,21 +1543,27 @@ function showResult() {
   let html = '<thead><tr><th>#</th><th>大分類</th><th>中分類</th><th>問題</th><th>あなた</th><th>正解</th><th>判定</th><th>所要時間</th><th>累積成績</th></tr></thead><tbody>';
   state.questions.forEach((q, idx) => {
     const ua = state.answers[idx];
-    const ok = ua !== null && isCorrect(q, ua);
+    const skipped = !!(state.skipped && state.skipped[idx]);
+    const ok = ua !== null && !skipped && isCorrect(q, ua);
     const ci = correctIndex(q);
     const dur = (state.durations && state.durations[idx]) || 0;
     const s = getStat(q);
     const cum = s.attempts > 0
       ? `${s.correct}/${s.attempts}（${s.rate}%）`
       : '—';
+    const vagueMark = (state.vague && state.vague[idx]) ? ' 🟡' : '';
+    const uaDisplay = skipped ? '<span class="skip-mark">スキップ</span>' : (ua === null ? '—' : escapeHtml(String(ua)));
+    const judgeBadge = skipped
+      ? '<span class="badge ng">スキップ</span>'
+      : `<span class="badge ${ok ? 'ok' : 'ng'}">${ok ? '○' : '×'}</span>`;
     html += `<tr>
       <td>${idx + 1}</td>
       <td>${escapeHtml(q.major)}</td>
       <td>${escapeHtml(q.minor)}</td>
       <td>${escapeHtml(q.question).slice(0, 60)}</td>
-      <td>${ua === null ? '—' : ua}</td>
+      <td>${uaDisplay}</td>
       <td>${ci + 1}</td>
-      <td><span class="badge ${ok ? 'ok' : 'ng'}">${ok ? '○' : '×'}</span></td>
+      <td>${judgeBadge}${vagueMark}</td>
       <td style="white-space:nowrap;">${fmtMs(dur)}</td>
       <td style="white-space:nowrap;">${cum}</td>
     </tr>`;
@@ -1380,23 +1609,131 @@ document.getElementById('reviewBtn').addEventListener('click', () => {
   card.style.display = (card.style.display === 'none') ? '' : 'none';
 });
 
+// --- 詳細レビュー画面 ---
+let reviewIndex = 0;
+
+function openDetailReview() {
+  reviewIndex = 0;
+  show('resultReviewView');
+  renderDetailReview();
+}
+
+function renderDetailReview() {
+  if (!state || !state.questions) return;
+  const total = state.questions.length;
+  if (reviewIndex < 0) reviewIndex = 0;
+  if (reviewIndex >= total) reviewIndex = total - 1;
+  const i = reviewIndex;
+  const q = state.questions[i];
+  const ua = state.answers[i];
+  const skipped = !!(state.skipped && state.skipped[i]);
+  const ok = ua !== null && !skipped && isCorrect(q, ua);
+  const ci = correctIndex(q);
+  const userIdx = (ua !== null && !skipped) ? parseInt(ua) - 1 : -1;
+  const dur = (state.durations && state.durations[i]) || 0;
+  const isVague = !!(state.vague && state.vague[i]);
+  const s = getStat(q);
+
+  document.getElementById('reviewProgressText').textContent = `第 ${i + 1} 問 / 全 ${total} 問`;
+  let judgeTxt;
+  if (skipped) judgeTxt = '⏭ スキップ';
+  else if (ok) judgeTxt = '✅ 正解';
+  else judgeTxt = '❌ 不正解';
+  if (isVague) judgeTxt += '  🟡 あいまい';
+  document.getElementById('reviewJudgeText').textContent = judgeTxt;
+  document.getElementById('reviewProgressBar').style.width = `${((i + 1) / total) * 100}%`;
+
+  // 情報行
+  const cum = s.attempts > 0 ? `累積 ${s.correct}/${s.attempts}（${s.rate}%）` : '累積 —';
+  document.getElementById('reviewInfo').innerHTML =
+    `<span>⏱ 所要時間: ${escapeHtml(fmtMs(dur))}</span>` +
+    `<span>${escapeHtml(cum)}</span>` +
+    (s.recent && s.recent.length ? `<span>直近: ${s.recent.slice(-5).map(c => c === 'o' ? '○' : '×').join('')}</span>` : '');
+
+  // タグ
+  document.getElementById('reviewTagLine').innerHTML =
+    `<span class="tag major">${escapeHtml(q.major)}</span>` +
+    `<span class="tag minor">${escapeHtml(q.minor)}</span>`;
+
+  // 問題文
+  document.getElementById('reviewQuestionText').textContent = q.question;
+
+  // 選択肢（正解/ユーザー誤答をマーキング）
+  const ca = document.getElementById('reviewChoicesArea');
+  ca.innerHTML = '';
+  q.choices.forEach((c, idx) => {
+    const div = document.createElement('div');
+    let cls = 'review-choice';
+    let mark = `${idx + 1}.`;
+    if (idx === ci) { cls += ' correct'; mark = `✓ ${idx + 1}.`; }
+    if (idx === userIdx && !ok) { cls += ' user-wrong'; mark = `✗ ${idx + 1}.`; }
+    div.className = cls;
+    div.innerHTML = `<span class="mark">${mark}</span>${escapeHtml(String(c))}`;
+    ca.appendChild(div);
+  });
+
+  // 解説
+  const exp = document.getElementById('reviewExplanation');
+  if (q.explanation && q.explanation.trim()) {
+    exp.style.display = '';
+    exp.className = 'feedback ' + (ok ? 'correct' : 'incorrect');
+    exp.textContent = '💡 ' + q.explanation;
+  } else {
+    exp.style.display = 'none';
+  }
+
+  // ナビボタンの有効/無効
+  document.getElementById('reviewPrevBtn').disabled = (i === 0);
+  document.getElementById('reviewNextBtn').disabled = (i === total - 1);
+
+  // 数式描画
+  typesetMath([
+    document.getElementById('reviewQuestionText'),
+    document.getElementById('reviewChoicesArea'),
+    document.getElementById('reviewExplanation')
+  ]);
+
+  // スクロールトップ
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('detailReviewBtn').addEventListener('click', openDetailReview);
+document.getElementById('reviewPrevBtn').addEventListener('click', () => {
+  if (reviewIndex > 0) { reviewIndex--; renderDetailReview(); }
+});
+document.getElementById('reviewNextBtn').addEventListener('click', () => {
+  if (reviewIndex < state.questions.length - 1) { reviewIndex++; renderDetailReview(); }
+});
+document.getElementById('reviewBackToResultBtn').addEventListener('click', () => {
+  show('resultView');
+});
+
 // --- CSV出力 ---
 document.getElementById('exportBtn').addEventListener('click', () => {
-  const header = ['問題文','選択肢1','選択肢2','選択肢3','選択肢4','正解','解説','大分類','中分類','あなたの回答','正誤','所要時間（秒）'];
+  const header = ['問題文','選択肢1','選択肢2','選択肢3','選択肢4','正解','解説','大分類','中分類','あなたの回答','正誤','あいまい','所要時間（秒）'];
   const rows = [header];
   state.questions.forEach((q, idx) => {
     const ua = state.answers[idx];
-    const ok = ua !== null && isCorrect(q, ua);
+    const skipped = !!(state.skipped && state.skipped[idx]);
+    const ok = ua !== null && !skipped && isCorrect(q, ua);
     const durSec = Math.round(((state.durations && state.durations[idx]) || 0) / 1000);
+    const orig = q._originalChoices || q.choices;
+    const vagueStr = (state.vague && state.vague[idx]) ? '○' : '';
+    let judge;
+    if (skipped) judge = 'スキップ';
+    else if (ua === null) judge = '未回答';
+    else judge = ok ? '○' : '×';
+    const correctOut = q._originalCorrect !== undefined ? q._originalCorrect : q.correct;
     rows.push([
       q.question,
-      q.choices[0], q.choices[1], q.choices[2], q.choices[3],
-      q.correct,
+      orig[0], orig[1], orig[2], orig[3],
+      correctOut,
       q.explanation,
       q.major,
       q.minor,
-      ua === null ? '' : ua,
-      ua === null ? '未回答' : (ok ? '○' : '×'),
+      skipped ? 'スキップ' : (ua === null ? '' : ua),
+      judge,
+      vagueStr,
       durSec
     ]);
   });
